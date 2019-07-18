@@ -1,9 +1,9 @@
 const { fromEvent, from, of, combineLatest } = rxjs;
 const { ajax } = rxjs.ajax;
-const { map, switchMap, pluck, mergeMap, scan, tap } = rxjs.operators;
+const { map, switchMap, pluck, mergeMap, scan } = rxjs.operators;
 
 // 버스 타입의 클래스를 결정하는 함수
-function getBuesType(name) {
+function getBusType(name) {
     if (/^광역/.test(name)) {
         return "yellow";
     } else if (/^직행/.test(name)) {
@@ -82,76 +82,82 @@ export default class Map {
     closeInfoWindow() {
         this.infowindow.close();
     }
-    
+
     // 전달된 위치 정보에서 정보창림을 보여줘야하는 지(true) 감춰야하는지(false) 여부를 반환한다.
     isOpenInfoWindow(position) {
         return !(position.equals(this.infowindow.getPosition()) && this.infowindow.getMap());
     }
     constructor($map) {
+        console.log(`constructor`);
         this.naverMap = createNaverMap($map);
         this.infowindow = createNaverInfoWindow();
 
-        // 새로 작성
         const station$ = this.createDragend$()
-                        .pipe(
-                            this.mapStation,
-                            this.manageMarker.bind(this),
-                            this.mapMarkerClick,
-                            this.mapBus
-                        );
+            .pipe(
+                this.mapStation,
+                this.manageMarker.bind(this),
+                this.mapMarkerClick,
+                this.mapBus
+            );
 
         station$.subscribe(({ markerInfo, buses }) => {
-            if (this.isOpenInfoWindow(markerInfo.position)) {
+            console.log(`station subscribe`);
+            if (this, this.isOpenInfoWindow(markerInfo.position)) {
                 this.openInfoWindow(
                     markerInfo.marker,
                     markerInfo.position,
-                    this.render(buses, markerInfo)
+                    this.render(buses, makerInfo)
                 );
             } else {
-                this.closeInfoWindow
+                this.closeInfoWindow();
             }
-        })
+        });
     }
 
     createDragend$() {
+        console.log(`createDragend`);
         return fromEvent(this.naverMap, "dragend") // 지도 영역을 dragend 했을 때
-        .pipe(
-            map(({ coord }) => ({
-                latitude: coord.x,
-                longitude: coord.y
-            }))
-        );
+            .pipe(
+                map(({ coord }) => ({
+                    latitude: coord.y,
+                    longitude: coord.x
+                }))
+            );
     }
 
     mapStation(coord$) {
+        console.log(`mapStation coord$ ${JSON.stringify(coord$)}`);
         return coord$
-        .pipe(
-            switchMap(coord => {
-                console.log(`coord ${JSON.stringify(coord)}`)
-                return ajax.getJSON(`/station/around/${coord.longitude}/${coord.latitude}`);
-            }),
-            pluck("busStationAroundList")
-        );
+            .pipe(
+                switchMap(coord => {
+                    console.log(`mapStation switchMap`);
+                    return ajax.getJSON(`/station/around/${coord.longitude}/${coord.latitude}`);
+                }),
+                pluck("busStationAroundList")
+            );
     }
 
     mapMarkerClick(marker$) {
         return marker$
-        .pipe(
-            mergeMap(marker =>fromEvent(marker, "click")),
-            map(({ overlay }) => ({
-                marker: overlay,
-                position: overlay.getPosition(),
-                id: overlay.getOption("id"),
-                name: overlay.getOption("name")
-            }))
-        );
+            .pipe(
+                mergeMap(marker => fromEvent(marker, "click")),
+                map(({ overlay }) => ({
+                    marker: overlay,
+                    position: overlay.getPosition(),
+                    id: overlay.getOptions("id"), // 버스정류소ID 정보를 얻음
+                    name: oberlay.getOptions("name") // 버스정류소 이름을 얻음
+                }))
+            );
     }
 
     manageMarker(station$) {
+        console.log(`manageMarker station$ ${JSON.stringify(station$)}`);
         return station$
             .pipe(
                 map(stations => stations.map(station => {
-                    const marker = this.createMarker(station.stationName, station.x, station.y); // 버스정류소ID, 버스정류소 이름 정보를 marker에 저장
+                    console.log('hello');
+                    const marker = this.createMarker(station.stationName, station.x, station.y);
+                    // 버스정류소ID, 버스정류소 이름 정보를 marker에 저장
                     marker.setOptions("id", station.stationId);
                     marker.setOptions("name", station.stationName);
                     return marker;
@@ -167,32 +173,32 @@ export default class Map {
     }
 
     mapBus(markerInfo$) {
+        console.log(`mapBus markerInfo ${JSON.stringify(markerInfo$)}`);
         return markerInfo$
-        .pipe(
-            switchMap(markerInfo => {
-                const marker$ = of(markerInfo);
-                const bus$ = ajax.getJSON(`/bus/pass/station/${markerInfo.id}`)
-                .pipe(pluck("busRouteList"));
-
-                return combineLatest(marker$, bus$, (marker, buses) => ({
-                    buses,
-                    markerInfo
-                }));
-            })
-        );
+            .pipe(
+                switchMap(markerInfo => {
+                    const marker$ = of(markerInfo);
+                    const bus$ = ajax.getJSON(`/bus/pass/station/${markerInfo.id}`)
+                        .pipe(pluck("busRouteList"));
+                    return combineLatest(markers$, bus$, (marker, buses) => ({
+                        buses,
+                        markerInfo
+                    }));
+                })
+            );
     }
 
     render(buses, { name }) {
         const list = buses.map(bus => (`<dd>
             <a href="#">
-                <strong>${bus.routeName}</strong> 
-                <span>${bus.regionName}</span>
-                <span class="type ${getBuesType(bus.routeTypeName)}">${bus.routeTypeName}</span>
+                <strong>${bus.routeName}</strong><span>${bus.regionName}</span>
+                <span class="type ${getBusType(bus.routeTypeName)}">${bus.routeTypeName}</span>
             </a>
-            </dd>`)).join("");
+        </dd>`)).join("");
 
-            return `<dl class="bus-routes">
-                        <dt><strong>${name}</strong></dt>${list}
-                    </dl>`;
+        return `<dl class="bus=routes">
+                    <dt><strong>${name}</strong></dt>${list}
+                </dl>`;
     }
+
 }
